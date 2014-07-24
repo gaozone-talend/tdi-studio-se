@@ -461,6 +461,28 @@ public class PropertiesTableEditorView<B> extends AbstractDataTableEditorView<B>
                         }
                     }
                     if (tcEditor != null) {
+                        //TESB-13951 : "Bean class" invisable if consumes type <> xml or jsone
+                        if(currentParam.getName().equals("BEAN") && "cCXFRS".equals(((INode)currentParam.getElement()).getComponent().getName())) {
+                            column.setLabelProvider(new IColumnLabelProvider<Map<String, Object>>() {
+                                public String getLabel(Map<String, Object> bean) {
+                                    if(bean != null) {
+                                        Object httpVerb = bean.get("HTTP_VERB");
+                                        Object consumes = bean.get("CONSUMES");
+                                        //(SCHEMAS.HTTP_VERB == 'GET') OR (SCHEMAS.HTTP_VERB == 'DELETE') OR (SCHEMAS.HTTP_VERB == 'OPTIONS') OR (SCHEMAS.CONSUMES != 'XML-JSON') AND (SCHEMAS.CONSUMES != 'JSON') AND (SCHEMAS.CONSUMES != 'XML')
+                                        if("GET".equals(httpVerb)
+                                                || "DELETE".equals(httpVerb)
+                                                || "OPTIONS".equals(httpVerb)
+                                                || (!"XML-JSON".equals(consumes)
+                                                        && !"JSON".equals(consumes)
+                                                        && !"XML".equals(consumes))) {
+                                            return "";
+                                        };
+                                    }
+                                    System.out.println(bean);
+                                    return null;
+                                }
+                            });
+                        }
                         column.setCellEditor(tcEditor);
                     }
                 }
