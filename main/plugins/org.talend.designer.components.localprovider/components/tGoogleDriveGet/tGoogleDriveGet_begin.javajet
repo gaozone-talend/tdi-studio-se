@@ -1,0 +1,207 @@
+<%@ jet 
+imports="
+    org.talend.core.model.process.INode 
+    org.talend.core.model.process.IConnection
+    org.talend.core.model.process.IConnectionCategory 
+    org.talend.core.model.process.ElementParameterParser 
+    org.talend.designer.codegen.config.CodeGeneratorArgument
+    org.talend.designer.codegen.config.NodeParamsHelper
+    org.talend.core.model.metadata.IMetadataTable 
+    org.talend.core.model.metadata.IMetadataColumn
+    org.talend.core.model.metadata.types.JavaTypesManager
+    org.talend.core.model.metadata.types.JavaType
+    java.util.List
+" 
+%>
+<%
+		CodeGeneratorArgument codeGenArgument = (CodeGeneratorArgument) argument;
+		INode node = (INode)codeGenArgument.getArgument();
+		String cid = node.getUniqueName();
+		NodeParamsHelper helper = new NodeParamsHelper(node);
+
+		String connection = helper.getStringParam("__CONNECTION__");
+	    String connectionKey = "\"conn_" + connection+"\"";
+		
+	    boolean isById = helper.getBoolParam("__BY_ID__");
+		String path = helper.getStringParam("__PATH__");
+		String outputFolder = helper.getStringParam("__OUTPUT__");
+		boolean storeToLocal = helper.getBoolParam("__STORE_TO_LOCAL__");
+		boolean dieOnError = helper.getBoolParam("__DIE_ON_ERROR__");
+		
+        String dataOutputConnection = null;
+	    
+		List< ? extends IConnection> outputConnections = node.getOutgoingSortedConnections();
+	    for(IConnection conn : outputConnections) {
+	        if(conn.getLineStyle().hasConnectionCategory(IConnectionCategory.DATA)) {
+	        	dataOutputConnection = conn.getName();
+	        	break;
+	        } // if(conn) end
+	    } // for(conns) end
+%>
+	com.google.api.services.drive.Drive <%=cid%>_client = (com.google.api.services.drive.Drive)globalMap.get(<%=connectionKey%>);
+	com.google.api.services.drive.model.File <%=cid%>_file = null;
+
+<%
+		if(isById) {
+%>
+	try{
+		<%=cid%>_file = <%=cid%>_client.files().get(<%=helper.getStringParam("__FILE_ID__")%>).execute();
+	}catch (java.lang.Exception e)
+	{
+<%
+		if(dieOnError) {
+%>
+			throw e;
+<%
+		} else {
+%>
+			System.err.println(e);
+<%
+		}
+%>
+	}
+<%
+		}else {
+			//search file by name.
+			
+		}
+%>
+
+
+	String <%=cid%>_path = normalizePath(<%=path%>);
+	boolean <%=cid%>_hasError = false;
+	String <%=cid%>_name = getFolderFromPath(<%=cid%>_path);
+
+	com.box.boxjavalibv2.dao.BoxFile <%=cid%>_boxFile = null;
+	com.box.restclientv2.requestsbase.BoxDefaultRequestObject <%=cid%>_requestObject = new com.box.restclientv2.requestsbase.BoxDefaultRequestObject();
+	//System.out.println("Searching for file in " + <%=cid%>_path);
+	try
+	{
+		com.box.boxjavalibv2.dao.BoxCollection <%=cid%>_searchResults = <%=cid%>_client.getSearchManager().search(<%=cid%>_name, <%=cid%>_requestObject);
+		for (com.box.boxjavalibv2.dao.BoxTypedObject <%=cid%>_entry : <%=cid%>_searchResults.getEntries())
+		{
+			if (<%=cid%>_entry instanceof com.box.boxjavalibv2.dao.BoxFile && ((com.box.boxjavalibv2.dao.BoxFile) <%=cid%>_entry).getName().equals(<%=cid%>_name))
+			{
+				if (<%=cid%>_path == null || <%=cid%>_path.isEmpty())
+				{
+					<%=cid%>_boxFile = ((com.box.boxjavalibv2.dao.BoxFile) <%=cid%>_entry);
+					break;
+				}
+				java.lang.StringBuilder <%=cid%>_sBuilder = new java.lang.StringBuilder();
+				for (com.box.boxjavalibv2.dao.BoxTypedObject <%=cid%>_obj : ((com.box.boxjavalibv2.dao.BoxFile) <%=cid%>_entry).getPathCollection().getEntries())
+				{
+					<%=cid%>_sBuilder.append(<%=cid%>_obj.getValue("name") + "/");
+				}
+				<%=cid%>_sBuilder.append(((com.box.boxjavalibv2.dao.BoxFile) <%=cid%>_entry).getName());
+				//System.out.println("FOUND - " + <%=cid%>_sBuilder.toString());
+				//System.out.println("NEED - " + <%=cid%>_path);
+				if (<%=cid%>_sBuilder.toString().equals(<%=cid%>_path))
+				{
+					<%=cid%>_boxFile = (com.box.boxjavalibv2.dao.BoxFile) <%=cid%>_entry;
+					break;
+				}
+			}
+			else if (<%=cid%>_entry instanceof com.box.boxjavalibv2.dao.BoxFolder && ((com.box.boxjavalibv2.dao.BoxFolder) <%=cid%>_entry).getName().equals(<%=cid%>_name))
+			{
+				java.lang.StringBuilder <%=cid%>_sBuilder = new java.lang.StringBuilder();
+				for (com.box.boxjavalibv2.dao.BoxTypedObject <%=cid%>_obj : ((com.box.boxjavalibv2.dao.BoxFolder) <%=cid%>_entry).getPathCollection().getEntries())
+				{
+					<%=cid%>_sBuilder.append(<%=cid%>_obj.getValue("name") + "/");
+				}
+				<%=cid%>_sBuilder.append(((com.box.boxjavalibv2.dao.BoxFolder) <%=cid%>_entry).getName());
+				if (<%=cid%>_sBuilder.toString().equals(<%=cid%>_path))
+				{
+<%
+					if(dieOnError) {
+%>
+						throw new Exception(<%=path%> + " exists but is a directory");
+<%
+					} else {
+%>
+						System.err.println(<%=path%> + " exists but is a directory");
+<%
+					}
+%>					
+					<%=cid%>_hasError = true;
+				}
+			}
+		}
+	}
+	catch (java.lang.Exception e)
+	{
+<%
+		if(dieOnError) {
+%>
+			throw e;
+<%
+		} else {
+%>
+			System.err.println(e);
+<%
+		}
+%>
+	}
+	if (<%=cid%>_boxFile == null && !<%=cid%>_hasError) {
+<%
+		if(dieOnError) {
+%>
+			throw new Exception("No file found in " + <%=path%>);
+<%
+		} else {
+%>
+			System.err.println("No file found in " + <%=path%>);
+<%
+		}
+%>
+	} else if (<%=cid%>_boxFile == null && <%=cid%>_hasError) {
+	//Do Nothing, error already occured
+	} else {
+		java.io.OutputStream <%=cid%>_fos = null;
+		java.io.InputStream <%=cid%>_bais = null;
+		try {
+<% if(storeToLocal) { %>
+		    java.io.File <%=cid%>_f = new java.io.File(<%=outputFolder%>);
+			if (!<%=cid%>_f.exists())
+			{
+				<%=cid%>_f.mkdirs();
+			}
+			String <%=cid%>_outputPath = <%=cid%>_f.getAbsolutePath() + java.io.File.separator + <%=cid%>_boxFile.getName();
+			<%=cid%>_fos = new java.io.FileOutputStream(<%=cid%>_outputPath);
+			<%=cid%>_client.getFilesManager().downloadFile(<%=cid%>_boxFile.getId(), new java.io.OutputStream[] {<%=cid%>_fos}, null, new com.box.restclientv2.requestsbase.BoxDefaultRequestObject());
+			globalMap.put("<%=cid %>_OUTPUT_PATH",<%=cid%>_outputPath);
+<%} else {%>
+			<%=cid%>_fos = new java.io.ByteArrayOutputStream();
+			<%=cid%>_client.getFilesManager().downloadFile(<%=cid%>_boxFile.getId(), new java.io.OutputStream[] {<%=cid%>_fos}, null, new com.box.restclientv2.requestsbase.BoxDefaultRequestObject());
+			((ByteArrayOutputStream) <%=cid%>_fos).flush();
+			((ByteArrayOutputStream) <%=cid%>_fos).close();
+			<%=cid%>_bais = new java.io.ByteArrayInputStream(((ByteArrayOutputStream) <%=cid%>_fos).toByteArray());
+<%if(dataOutputConnection != null){%>
+			<%=dataOutputConnection%>.fileName = <%=cid%>_boxFile.getName();
+			<%=dataOutputConnection%>.content = <%=cid%>_bais;	
+<%} else {%>
+			globalMap.put("<%=cid %>_INPUT_STREAM", <%=cid%>_bais);
+<%}
+}%>
+			
+		} catch (java.lang.Exception e) {
+<%
+			if(dieOnError) {
+%>
+				throw e;
+<%
+			} else {
+%>
+				System.err.println("<%=cid%> - " + e.getMessage());
+<%
+			}
+%>
+		} finally {
+			if(<%=cid%>_fos != null){
+				try {
+					<%=cid%>_fos.close();
+				} catch (java.io.IOException e) {
+					// Ignore
+				}
+			}
+		}
+	}	

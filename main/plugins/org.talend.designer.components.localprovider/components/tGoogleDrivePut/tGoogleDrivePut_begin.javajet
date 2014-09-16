@@ -1,0 +1,35 @@
+<%@ jet 
+imports="
+    org.talend.core.model.process.INode 
+    org.talend.core.model.process.IConnection
+    org.talend.core.model.process.IConnectionCategory 
+    org.talend.core.model.process.ElementParameterParser 
+    org.talend.designer.codegen.config.CodeGeneratorArgument
+    org.talend.core.model.metadata.IMetadataTable 
+    org.talend.core.model.metadata.IMetadataColumn
+    org.talend.core.model.metadata.types.JavaTypesManager
+    org.talend.core.model.metadata.types.JavaType
+    java.util.List
+" 
+%>
+<%
+		CodeGeneratorArgument codeGenArgument = (CodeGeneratorArgument) argument;
+		INode node = (INode)codeGenArgument.getArgument();
+		String cid = node.getUniqueName();
+		
+		String connection = ElementParameterParser.getValue(node,"__CONNECTION__");
+	    String connectionKey = "\"conn_" + connection+"\"";
+		
+		String parentId = ElementParameterParser.getValue(node, "__PARENT_ID__");
+		String filePath = ElementParameterParser.getValue(node, "__FILE_PATH__");
+		
+		boolean dieOnError = "true".equals(ElementParameterParser.getValue(node, "__DIE_ON_ERROR__"));
+		
+%>
+
+	com.google.api.services.drive.Drive <%=cid%>_client = (com.google.api.services.drive.Drive)globalMap.get(<%=connectionKey%>);
+	
+	com.google.api.services.drive.model.File <%=cid%>_file = new com.google.api.services.drive.model.File();
+	com.google.api.client.http.FileContent <%=cid%>_fContent = new com.google.api.client.http.FileContent(null, new java.io.File(<%=filePath%>));
+    
+	<%=cid%>_file = <%=cid%>_client.files().insert(<%=cid%>_file, <%=cid%>_fContent).execute();
